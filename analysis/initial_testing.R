@@ -167,11 +167,21 @@ analyze_gene = function(gene_dat){
            iter = 10000,
            warmup = 500)
 
-  coda::HPDinterval(coda::mcmc(rstan::extract(samp_res, 'log_fc')$log_fc %>% as.matrix(ncol = 1)))
+  res = list(mean_lfc = mean(rstan::extract(samp_res, 'log_fc')$log_fc),
+             lfc_hdi = coda::HPDinterval(coda::mcmc(rstan::extract(samp_res, 'log_fc')$log_fc %>% as.matrix(ncol = 1))))
+  return(res)
 }
 
 lfc_hdis = cdat %>%
   group_by(GENE) %>%
   nest %>%
-  head(n = 30) %>%
-  mutate(log_fc_hdi = mclapply(data, analyze_gene, mc.cores = 3))
+  mutate(analysis_res = mclapply(data, analyze_gene, mc.cores = 20),
+         mean_lfc = map_dbl(analysis_res, ~.x$mean_lfc),
+         lfc_hdi_lower = map_dbl(analysis_res, ~.x$lfc_hdi[1]),
+         lfc_hdi_upper = map_dbl(analysis_res, ~.x$lfc_hdi[2]),
+         different = map2_lgl(lfc_hdi_lower,
+                              lfc_hdi_upper,
+                              ~!between(0, .x, .y)))
+
+save(lfc_hdis,
+     file = 'outputs/lfc_hdis.RData')
