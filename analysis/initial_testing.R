@@ -64,7 +64,7 @@ nb_fits = cdat %>%
 
 #### We'll use T0 oas the prior
 gamma_priors = nb_fits %>%
-  filter(grepl('T0', sample)) %>%
+  filter(grepl('T0|T35A|T35B', sample)) %>%
   mutate(differing_values = map_lgl(counts, ~n_distinct(.x$count) > 2)) %>% # This cuts out 17 / 15657
   filter(differing_values) %>%
   select(-nb_fit, -counts) %>%
@@ -148,22 +148,30 @@ crispr_model = stan_model('src/stan_files/crispr_model.stan')
 
 analyze_gene = function(gene_dat){
   data_list = list(n_gRNA = nrow(gene_dat),
-                   treatment_counts = gene_dat %>% pull(HPAF_T35B),
-                   ctrl_counts = gene_dat %>% pull(HPAF_T35A),
-                   t0_counts = gene_dat %>% pull(HPAF_T0),
+                   treatment_counts = gene_dat %>% pull(HPAF_T35B) %>% as.integer,
+                   ctrl_counts = gene_dat %>% pull(HPAF_T35A) %>% as.integer,
+                   t0_counts = gene_dat %>% pull(HPAF_T0) %>% as.integer,
                    ctrl_depth = sample_depths$depth_factor[2],
                    treatment_depth = sample_depths$depth_factor[3],
                    t0_depth = sample_depths$depth_factor[1],
-                   t0_mu_prior = gamma_priors$mu_gamma_prior[[1]]$par,
-                   t0_phi_prior = gamma_priors$phi_gamma_prior[[1]]$par,
-                   treatment_mu_prior = gamma_priors$mu_gamma_prior[[1]]$par,
-                   treatment_phi_prior = gamma_priors$phi_gamma_prior[[1]]$par,
-                   ctrl_mu_prior = gamma_priors$mu_gamma_prior[[1]]$par,
-                   ctrl_phi_prior = gamma_priors$phi_gamma_prior[[1]]$par)
+                   t0_mu_prior = gamma_priors %>% filter(sample == 'HPAF_T0') %>% .$mu_gamma_prior %>% .[[1]] %>% .$par,
+                   t0_phi_prior =  gamma_priors %>% filter(sample == 'HPAF_T0') %>% .$phi_gamma_prior %>% .[[1]] %>% .$par,
+                   treatment_mu_prior =  gamma_priors %>% filter(sample == 'HPAF_T35B') %>% .$mu_gamma_prior %>% .[[1]] %>% .$par,
+                   treatment_phi_prior =  gamma_priors %>% filter(sample == 'HPAF_T35B') %>% .$phi_gamma_prior %>% .[[1]] %>% .$par,
+                   ctrl_mu_prior =  gamma_priors %>% filter(sample == 'HPAF_T35A') %>% .$mu_gamma_prior %>% .[[1]] %>% .$par,
+                   ctrl_phi_prior =  gamma_priors %>% filter(sample == 'HPAF_T35A') %>% .$phi_gamma_prior %>% .[[1]] %>% .$par)
 
-  sampling()
+  samp_res = sampling(object = crispr_model,
+           data = data_list,
+           chains = 1,
+           iter = 10000,
+           warmup = 500)
+
+  coda::HPDinterval(coda::mcmc(rstan::extract(samp_res, 'log_fc')$log_fc %>% as.matrix(ncol = 1)))
 }
 
-cdat %>%
+lfc_hdis = cdat %>%
   group_by(GENE) %>%
-  nest
+  nest %>%
+  head(n = 30) %>%
+  mutate(log_fc_hdi = mclapply(data, analyze_gene, mc.cores = 3))
