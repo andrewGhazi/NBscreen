@@ -3,9 +3,9 @@ data{
   int<lower=0> treatment_counts[n_gRNA];
   int<lower=0> ctrl_counts[n_gRNA];
   int<lower=0> t0_counts[n_gRNA];
-  int<lower=0> ctrl_depth;
-  int<lower=0> treatment_depth;
-  int<lower=0> t0_depth;
+  real<lower=0> ctrl_depth;
+  real<lower=0> treatment_depth;
+  real<lower=0> t0_depth;
 
   real<lower=0> t0_mu_prior[2];
   real<lower=0> t0_phi_prior[2];
