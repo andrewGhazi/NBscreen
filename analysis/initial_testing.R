@@ -4,7 +4,7 @@ library(parallel)
 library(readxl)
 library(rstan)
 
-cdat = read_excel('data/nm.4219-S2.xlsx')
+cdat = read_excel('~/NBscreen/data/nm.4219-S2.xlsx')
 
 # HPAF, ASPC1, PATU are cell lines
 # TXX is time point XX
@@ -144,7 +144,7 @@ nb_fits %>%
 #### Stan model ----
 # needs to have per gRNA effects? not sure how input concentration is accounted for
 
-crispr_model = stan_model('src/stan_files/crispr_model.stan')
+crispr_model = stan_model('~/NBscreen/src/stan_files/crispr_model.stan')
 
 analyze_gene = function(gene_dat){
   data_list = list(n_gRNA = nrow(gene_dat),
@@ -175,7 +175,7 @@ analyze_gene = function(gene_dat){
 lfc_hdis = cdat %>%
   group_by(GENE) %>%
   nest %>%
-  mutate(analysis_res = mclapply(data, analyze_gene, mc.cores = 20),
+  mutate(analysis_res = mclapply(data, analyze_gene, mc.cores = 19),
          mean_lfc = map_dbl(analysis_res, ~.x$mean_lfc),
          lfc_hdi_lower = map_dbl(analysis_res, ~.x$lfc_hdi[1]),
          lfc_hdi_upper = map_dbl(analysis_res, ~.x$lfc_hdi[2]),
@@ -184,4 +184,4 @@ lfc_hdis = cdat %>%
                               ~!between(0, .x, .y)))
 
 save(lfc_hdis,
-     file = 'outputs/lfc_hdis.RData')
+     file = '~/NBscreen/outputs/lfc_hdis.RData')
